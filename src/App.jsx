@@ -136,10 +136,24 @@ function paraNumero(valor) {
   return Number.isFinite(numero) ? numero : 0
 }
 
+function formatarPrecoDigitado(valor) {
+  const apenasDigitos = String(valor).replace(/\D/g, '')
+
+  if (!apenasDigitos) {
+    return '0,00'
+  }
+
+  return (Number(apenasDigitos) / 100).toFixed(2).replace('.', ',')
+}
+
+function formatarPrecoParaInputBR(valor) {
+  return Math.max(0, paraNumero(valor)).toFixed(2).replace('.', ',')
+}
+
 function App() {
   const [nome, setNome] = useState('')
   const [quantidade, setQuantidade] = useState('1')
-  const [precoUnitario, setPrecoUnitario] = useState('0')
+  const [precoUnitario, setPrecoUnitario] = useState('0,00')
   const [itens, setItens] = useState(() =>
     lerStorage(CHAVE_ITENS, []).map(normalizarItem).filter((item) => item.nome),
   )
@@ -225,7 +239,7 @@ function App() {
   function limparFormulario() {
     setNome('')
     setQuantidade('1')
-    setPrecoUnitario('0')
+    setPrecoUnitario('0,00')
   }
 
   function adicionarItem(evento) {
@@ -293,7 +307,7 @@ function App() {
   }
 
   function definirPrecoUnitario(id, novoValor) {
-    const precoNumero = Math.max(0, paraNumero(novoValor))
+    const precoNumero = Math.max(0, paraNumero(formatarPrecoDigitado(novoValor)))
 
     setItens((itensAtuais) =>
       itensAtuais.map((item) => {
@@ -569,11 +583,10 @@ function App() {
             <label>
               Preco unitario (R$)
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="numeric"
                 value={precoUnitario}
-                onChange={(evento) => setPrecoUnitario(evento.target.value)}
+                onChange={(evento) => setPrecoUnitario(formatarPrecoDigitado(evento.target.value))}
                 required
               />
             </label>
@@ -663,10 +676,9 @@ function App() {
                       <label className="campo-item">
                         Valor unitario (R$)
                         <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.precoUnitario}
+                          type="text"
+                          inputMode="numeric"
+                          value={formatarPrecoParaInputBR(item.precoUnitario)}
                           onChange={(evento) => definirPrecoUnitario(item.id, evento.target.value)}
                         />
                       </label>
