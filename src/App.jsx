@@ -136,14 +136,32 @@ function paraNumero(valor) {
   return Number.isFinite(numero) ? numero : 0
 }
 
-function formatarPrecoDigitado(valor) {
-  const apenasDigitos = String(valor).replace(/\D/g, '')
+function parsePrecoLivre(valor) {
+  const texto = String(valor).trim()
 
-  if (!apenasDigitos) {
-    return '0,00'
+  if (!texto) {
+    return 0
   }
 
-  return (Number(apenasDigitos) / 100).toFixed(2).replace('.', ',')
+  const limpo = texto.replace(/[^\d.,]/g, '')
+
+  if (!limpo) {
+    return 0
+  }
+
+  const possuiSeparador = limpo.includes(',') || limpo.includes('.')
+
+  if (!possuiSeparador) {
+    return Number(limpo) / 100
+  }
+
+  const ultimoSeparador = Math.max(limpo.lastIndexOf(','), limpo.lastIndexOf('.'))
+  const parteInteira = limpo.slice(0, ultimoSeparador).replace(/[.,]/g, '') || '0'
+  const parteDecimal = limpo.slice(ultimoSeparador + 1).replace(/[.,]/g, '')
+  const normalizado = `${parteInteira}.${parteDecimal}`
+  const numero = Number(normalizado)
+
+  return Number.isFinite(numero) ? numero : 0
 }
 
 function formatarPrecoParaInputBR(valor) {
@@ -154,6 +172,7 @@ function App() {
   const [nome, setNome] = useState('')
   const [quantidade, setQuantidade] = useState('1')
   const [precoUnitario, setPrecoUnitario] = useState('0,00')
+  const [precosDigitadosItens, setPrecosDigitadosItens] = useState({})
   const [itens, setItens] = useState(() =>
     lerStorage(CHAVE_ITENS, []).map(normalizarItem).filter((item) => item.nome),
   )
@@ -246,7 +265,7 @@ function App() {
     evento.preventDefault()
 
     const quantidadeNumero = Math.max(1, Math.floor(paraNumero(quantidade)))
-    const precoNumero = paraNumero(precoUnitario)
+    const precoNumero = parsePrecoLivre(precoUnitario)
     const nomeTratado = nome.trim()
 
     if (!nomeTratado || precoNumero <= 0) {
@@ -307,7 +326,7 @@ function App() {
   }
 
   function definirPrecoUnitario(id, novoValor) {
-    const precoNumero = Math.max(0, paraNumero(formatarPrecoDigitado(novoValor)))
+    const precoNumero = Math.max(0, parsePrecoLivre(novoValor))
 
     setItens((itensAtuais) =>
       itensAtuais.map((item) => {
@@ -321,6 +340,33 @@ function App() {
         }
       }),
     )
+  }
+
+  function atualizarPrecoDigitadoItem(id, valor) {
+    setPrecosDigitadosItens((precosAtuais) => ({
+      ...precosAtuais,
+      [id]: valor,
+    }))
+  }
+
+  function aplicarMascaraPrecoItem(id) {
+    const valorDigitado = precosDigitadosItens[id]
+
+    if (valorDigitado === undefined) {
+      return
+    }
+
+    definirPrecoUnitario(id, valorDigitado)
+
+    setPrecosDigitadosItens((precosAtuais) => {
+      const { [id]: _removido, ...restante } = precosAtuais
+      return restante
+    })
+  }
+
+  function aplicarMascaraPrecoFormulario() {
+    const precoNumero = Math.max(0, parsePrecoLivre(precoUnitario))
+    setPrecoUnitario(formatarPrecoParaInputBR(precoNumero))
   }
 
   function carregarListaPredefinida() {
@@ -584,9 +630,10 @@ function App() {
               Preco unitario (R$)
               <input
                 type="text"
-                inputMode="numeric"
+                inputMode="decimal"
                 value={precoUnitario}
-                onChange={(evento) => setPrecoUnitario(formatarPrecoDigitado(evento.target.value))}
+                onChange={(evento) => setPrecoUnitario(evento.target.value)}
+                onBlur={aplicarMascaraPrecoFormulario}
                 required
               />
             </label>
@@ -677,9 +724,15 @@ function App() {
                         Valor unitario (R$)
                         <input
                           type="text"
-                          inputMode="numeric"
-                          value={formatarPrecoParaInputBR(item.precoUnitario)}
-                          onChange={(evento) => definirPrecoUnitario(item.id, evento.target.value)}
+                          inputMode="decimal"
+                          value={
+                            precosDigitadosItens[item.id] ??
+                            formatarPrecoParaInputBR(item.precoUnitario)
+                          }
+                          onChange={(evento) =>
+                            atualizarPrecoDigitadoItem(item.id, evento.target.value)
+                          }
+                          onBlur={() => aplicarMascaraPrecoItem(item.id)}
                         />
                       </label>
                     </div>
